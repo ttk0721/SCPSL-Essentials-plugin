@@ -8,28 +8,27 @@ using PluginAPI.Core.Attributes;
 using PluginAPI.Enums;
 using PluginAPI.Events;
 using PlayerRoles;
-using PlayerRoles.PlayableScps;
 using InventorySystem;
 using InventorySystem.Items;
-using InventorySystem.Items.Pickups;
 using Interactables.Interobjects.DoorUtils;
-using MapGeneration.Distributors;
-using Mirror; // Dodane odwołanie do Mirror dla NetworkBehaviour
+using Mirror;
+using CommandSystem;
+using PlayerStatsSystem;
+using System.Collections;
 
-// Definiujemy brakujący enum
-public enum EffectType
-{
-    Concussed,
-    Visuals939
-    // Dodaj więcej typów efektów w razie potrzeby
-}
+// Enum dla efektów (zakomentowane, bo wymaga PlayerEffects)
+// public enum EffectType
+// {
+//     Concussed,
+//     AmnesiaVision,
+//     Invisible
+// }
 
 public class CustomPlugin
 {
-    // Rozszerzone zmienne stanu
+    // Zmienne stanu pluginu
     private bool roundInProgress = false;
     private bool spyAssigned = false;
-    // Jawne określenie typu Random aby uniknąć niejednoznaczności
     private static System.Random rng = new System.Random();
     private readonly ItemType Scp035ItemType = ItemType.KeycardO5;
     private HashSet<GameObject> brokenElevators = new HashSet<GameObject>();
@@ -39,9 +38,9 @@ public class CustomPlugin
     private bool voiceChatEnabled = false;
     private Dictionary<Player, DateTime> playerJoinTimes = new Dictionary<Player, DateTime>();
 
-    // Nowe efekty monetki
-    private readonly int coinOutcomes = 25; // Zwiększona liczba efektów do 25
-    private Dictionary<Player, UnityEngine.Coroutine> activeCoroutines = new Dictionary<Player, UnityEngine.Coroutine>();
+    // Liczba efektów monetki
+    private readonly int coinOutcomes = 25; // 25 różnych efektów
+    private Dictionary<Player, Coroutine> activeCoroutines = new Dictionary<Player, Coroutine>();
 
     [PluginEntryPoint("CustomPlugin", "2.0.0", "Rozbudowany plugin z dodatkowymi funkcjami", "Autor")]
     private void OnLoaded()
@@ -52,29 +51,28 @@ public class CustomPlugin
         SetupCustomItems();
     }
 
-    // Implementacja brakującej metody
+    // Inicjalizacja czatu głosowego
     private void InitializeVoiceChat()
     {
         voiceChatEnabled = true;
         Log.Info("Inicjalizacja czatu głosowego...");
     }
 
-    // Rozszerzone zdarzenie rzutu monetą
+    // Zdarzenie rzutu monetą z 25 efektami
     [PluginEvent]
     private void OnPlayerCoinFlip(PlayerCoinFlipEvent ev)
     {
         Player player = ev.Player;
         int outcome = rng.Next(coinOutcomes);
 
-        // Zastąpienie konstrukcji switch expression standardowym switch dla zgodności z C# 7.3
         string effectName;
         switch (outcome)
         {
             case 0: effectName = TeleportPlayer(player); break;
             case 1: effectName = HealPlayer(player); break;
             case 2: effectName = ChangePlayerClass(player); break;
-            case 3: effectName = GrantTemporaryInvisibility(player); break;
-            case 4: effectName = BoostPlayerSpeed(player); break;
+            // case 3: effectName = GrantTemporaryInvisibility(player); break; // Zakomentowane (PlayerEffects)
+            // case 4: effectName = BoostPlayerSpeed(player); break; // Zakomentowane (PlayerMovementSync)
             case 5: effectName = GiveRandomItem(player); break;
             case 6: effectName = GrantDamageImmunity(player); break;
             case 7: effectName = DropCurrentItem(player); break;
@@ -83,17 +81,17 @@ public class CustomPlugin
             case 10: effectName = BoostDamageOutput(player); break;
             case 11: effectName = PullNearbyPlayers(player); break;
             case 12: effectName = DisguisePlayer(player); break;
-            case 13: effectName = TemporaryAmnesia(player); break;
-            case 14: effectName = SpawnGrenadeNearby(player); break;
-            case 15: effectName = InvertPlayerControls(player); break;
+            // case 13: effectName = TemporaryAmnesia(player); break; // Zakomentowane (PlayerEffects)
+            // case 14: effectName = SpawnGrenadeNearby(player); break; // Zakomentowane (ItemFactory)
+            // case 15: effectName = InvertPlayerControls(player); break; // Zakomentowane (PlayerEffects)
             case 16: effectName = SwapInventoryWithRandom(player); break;
-            case 17: effectName = ActivateNightVision(player); break;
+            // case 17: effectName = ActivateNightVision(player); break; // Zakomentowane (PlayerEffects)
             case 18: effectName = CreateDecoyClone(player); break;
             case 19: effectName = ShuffleAllPlayers(player); break;
             case 20: effectName = ToggleWeapons(player); break;
-            case 21: effectName = EnableDoubleJump(player); break;
+            // case 21: effectName = EnableDoubleJump(player); break; // Zakomentowane (PlayerMovementSync)
             case 22: effectName = CreateForceField(player); break;
-            case 23: effectName = SummonItemRain(player); break;
+            // case 23: effectName = SummonItemRain(player); break; // Zakomentowane (ItemFactory)
             case 24: effectName = TimeShiftPlayers(player); break;
             default: effectName = "Nieznany efekt"; break;
         }
@@ -101,7 +99,7 @@ public class CustomPlugin
         Log.Info($"[CoinFlip] {player.Nickname} otrzymał efekt: {effectName}");
     }
 
-    // Implementacje brakujących metod
+    // Implementacje efektów monetki
     private string TeleportPlayer(Player player)
     {
         Vector3 randomPosition = new Vector3(UnityEngine.Random.Range(-50, 50), 0, UnityEngine.Random.Range(-50, 50));
@@ -112,7 +110,6 @@ public class CustomPlugin
 
     private string HealPlayer(Player player)
     {
-        // Implementacja uzdrawiania gracza
         player.Health = player.MaxHealth;
         player.SendBroadcast("Zostałeś wyleczony!", 5);
         return "Leczenie";
@@ -126,29 +123,29 @@ public class CustomPlugin
         return "Zmiana klasy";
     }
 
-    //private string GrantTemporaryInvisibility(Player player)
-    //{
-    //    player.IsInvisible = true;
+    /*
+    private string GrantTemporaryInvisibility(Player player)
+    {
+        player.EffectsManager.EnableEffect<Invisible>(10f);
+        Task.Delay(10000).ContinueWith(t => player.EffectsManager.DisableEffect<Invisible>());
+        player.SendBroadcast("Jesteś niewidzialny przez 10 sekund!", 5);
+        return "Niewidzialność";
+    }
+    */
 
-    //     Dodajemy komponent EffectTimer do obiektu gracza
-    //    player.GameObject.AddComponent<EffectTimer>().Initialize(
-    //        player,
-    //        () => player.IsInvisible = false,
-    //        10f
-    //    );
-
-    //    player.SendBroadcast("Jesteś niewidzialny przez 10 sekund!", 5);
-    //    return "Niewidzialność";
-    //}
-
-
-    //private string BoostPlayerSpeed(Player player)
-    //{
-    //    player.MoveSpeed *= 1.5f;
-    //    UnityEngine.MonoBehaviour.Invoke(() => player.MoveSpeed /= 1.5f, 15f);
-    //    player.SendBroadcast("Twoja prędkość została zwiększona na 15 sekund!", 5);
-    //    return "Zwiększenie prędkości";
-    //}
+    /*
+    private string BoostPlayerSpeed(Player player)
+    {
+        var movement = player.GameObject.GetComponent<PlayerMovementSync>();
+        if (movement != null)
+        {
+            movement._speedMultiplier = 1.5f; // Zwiększ prędkość o 50%
+            Task.Delay(15000).ContinueWith(t => movement._speedMultiplier = 1.0f); // Reset po 15 sekundach
+            player.SendBroadcast("Twoja prędkość została zwiększona na 15 sekund!", 5);
+        }
+        return "Zwiększenie prędkości";
+    }
+    */
 
     private string GiveRandomItem(Player player)
     {
@@ -158,24 +155,24 @@ public class CustomPlugin
         return "Losowy przedmiot";
     }
 
-    //private string GrantDamageImmunity(Player player)
-    //{
-    //    // Implementacja odporności na obrażenia
-    //    player.IsGodModeEnabled = true;
-    //    UnityEngine.MonoBehaviour.Invoke(() => player.IsGodModeEnabled = false, 20f);
-    //    player.SendBroadcast("Jesteś odporny na obrażenia przez 20 sekund!", 5);
-    //    return "Odporność na obrażenia";
-    //}
+    private string GrantDamageImmunity(Player player)
+    {
+        player.IsGodModeEnabled = true;
+        Task.Delay(20000).ContinueWith(t => player.IsGodModeEnabled = false);
+        player.SendBroadcast("Jesteś odporny na obrażenia przez 20 sekund!", 5);
+        return "Odporność na obrażenia";
+    }
 
-    //private string DropCurrentItem(Player player)
-    //{
-    //    if (player.CurrentItem != null)
-    //    {
-    //        player.DropHeldItem();
-    //        player.SendBroadcast("Upuściłeś swój przedmiot!", 5);
-    //    }
-    //    return "Upuszczenie przedmiotu";
-    //}
+    private string DropCurrentItem(Player player)
+    {
+        if (player.CurrentItem != null)
+        {
+            // Poprawiona linia: Używamy ItemSerial zamiast Serial
+            player.ReferenceHub.inventory.ServerDropItem(player.CurrentItem.ItemSerial);
+            player.SendBroadcast("Upuściłeś swój przedmiot!", 5);
+        }
+        return "Upuszczenie przedmiotu";
+    }
 
     private string SwapWithRandomPlayer(Player player)
     {
@@ -183,7 +180,7 @@ public class CustomPlugin
             .Where(p => p != player && p.IsAlive)
             .OrderBy(_ => UnityEngine.Random.value)
             .FirstOrDefault();
-            
+
         if (randomPlayer != null)
         {
             Vector3 tempPosition = player.Position;
@@ -196,21 +193,19 @@ public class CustomPlugin
 
     private string TeleportToRandomRoom(Player player)
     {
-        // Implementacja teleportacji do losowego pokoju
         Vector3 randomRoomPosition = new Vector3(UnityEngine.Random.Range(-100, 100), 0, UnityEngine.Random.Range(-100, 100));
         player.Position = randomRoomPosition;
         player.SendBroadcast("Teleportowano cię do losowego pomieszczenia!", 5);
         return "Teleportacja do pomieszczenia";
     }
 
-    //private string BoostDamageOutput(Player player)
-    //{
-    //    // Implementacja zwiększenia obrażeń
-    //    player.DamageMultiplier = 2.0f;
-    //    UnityEngine.MonoBehaviour.Invoke(() => player.DamageMultiplier = 1.0f, 15f);
-    //    player.SendBroadcast("Twoje obrażenia zostały zwiększone na 15 sekund!", 5);
-    //    return "Zwiększenie obrażeń";
-    //}
+    private string BoostDamageOutput(Player player)
+    {
+        // Placeholder: Zwiększenie obrażeń wymaga dostosowania do API
+        Task.Delay(15000).ContinueWith(t => { /* reset obrażeń */ });
+        player.SendBroadcast("Twoje obrażenia zostały zwiększone na 15 sekund!", 5);
+        return "Zwiększenie obrażeń";
+    }
 
     private string PullNearbyPlayers(Player player)
     {
@@ -223,23 +218,24 @@ public class CustomPlugin
         return "Przyciągnięcie graczy";
     }
 
-   //private string DisguisePlayer(Player player)
-   // {
-   //     // Implementacja przebrania gracza
-   //     player.DisplayNickname = $"[FAKE] {Player.GetPlayers().OrderBy(_ => UnityEngine.Random.value).First().Nickname}";
-   //     UnityEngine.MonoBehaviour.Invoke(() => player.DisplayNickname = player.Nickname, 30f);
-   //     player.SendBroadcast("Zostałeś przebrany na 30 sekund!", 5);
-   //     return "Przebranie";
-   // }
+    private string DisguisePlayer(Player player)
+    {
+        player.DisplayNickname = $"[FAKE] {Player.GetPlayers().OrderBy(_ => UnityEngine.Random.value).First().Nickname}";
+        Task.Delay(30000).ContinueWith(t => player.DisplayNickname = player.Nickname);
+        player.SendBroadcast("Zostałeś przebrany na 30 sekund!", 5);
+        return "Przebranie";
+    }
 
-    //private string TemporaryAmnesia(Player player)
-    //{
-    //    // Implementacja tymczasowej amnezji
-    //    PlayerExtensions.ApplyEffect(player, EffectType.Concussed, 1, 15f);
-    //    player.SendBroadcast("Masz chwilową amnezję! Niektóre funkcje są niedostępne przez 15 sekund.", 5);
-    //    return "Amnezja";
-    //}
+    /*
+    private string TemporaryAmnesia(Player player)
+    {
+        player.EffectsManager.EnableEffect<Concussed>(15f);
+        player.SendBroadcast("Masz chwilową amnezję przez 15 sekund!", 5);
+        return "Amnezja";
+    }
+    */
 
+    /*
     private string SpawnGrenadeNearby(Player player)
     {
         Vector3 grenadePosition = player.Position + new Vector3(UnityEngine.Random.Range(-5, 5), 1, UnityEngine.Random.Range(-5, 5));
@@ -248,102 +244,95 @@ public class CustomPlugin
         player.SendBroadcast("W pobliżu pojawił się granat!", 5);
         return "Pojawienie się granatu";
     }
+    */
 
-    // Nowe efekty monetki (dodatkowe efekty)
-    //private string InvertPlayerControls(Player player)
-    //{
-    //    PlayerExtensions.ApplyEffect(player, EffectType.Concussed, 1, 30f);
-    //    player.SendBroadcast("Efekt: Kontrola odwrócona na 30s!", 5);
-    //    return "Odwrócenie kontrolek";
-    //}
+    /*
+    private string InvertPlayerControls(Player player)
+    {
+        player.EffectsManager.EnableEffect<Concussed>(30f);
+        player.SendBroadcast("Efekt: Kontrola odwrócona na 30s!", 5);
+        return "Odwrócenie kontrolek";
+    }
+    */
 
-    //private string SwapInventoryWithRandom(Player player)
-    //{
-    //    Player target = Player.GetPlayers()
-    //        .Where(p => p != player && p.IsAlive)
-    //        .OrderBy(_ => UnityEngine.Random.value)
-    //        .FirstOrDefault();
-            
-    //    if (target != null)
-    //    {
-    //        var playerItems = player.Items.ToList();
-    //        var targetItems = target.Items.ToList();
+    private string SwapInventoryWithRandom(Player player)
+    {
+        Player target = Player.GetPlayers()
+            .Where(p => p != player && p.IsAlive)
+            .OrderBy(_ => UnityEngine.Random.value)
+            .FirstOrDefault();
 
-    //        // Poprawna implementacja wymiany przedmiotów
-    //        foreach (var item in playerItems)
-    //        {
-    //            PlayerExtensions.RemoveItem(player, item);
-    //        }
+        if (target != null)
+        {
+            var playerInventory = player.ReferenceHub.inventory;
+            var targetInventory = target.ReferenceHub.inventory;
 
-    //        foreach (var item in targetItems)
-    //        {
-    //            PlayerExtensions.RemoveItem(target, item);
-    //        }
+            var playerItems = playerInventory.UserInventory.Items.ToList();
+            var targetItems = targetInventory.UserInventory.Items.ToList();
 
-    //        foreach (var item in playerItems)
-    //        {
-    //            PlayerExtensions.AddItem(target, item);
-    //        }
+            playerInventory.UserInventory.Items.Clear();
+            targetInventory.UserInventory.Items.Clear();
 
-    //        foreach (var item in targetItems)
-    //        {
-    //            PlayerExtensions.AddItem(player, item);
-    //        }
+            foreach (var item in playerItems)
+                targetInventory.UserInventory.Items.Add(item.Key, item.Value);
+            foreach (var item in targetItems)
+                playerInventory.UserInventory.Items.Add(item.Key, item.Value);
 
-    //        return "Wymiana ekwipunku";
-    //    }
-    //    return "Brak celu wymiany";
-    //}
+            player.SendBroadcast("Wymieniono ekwipunek z losowym graczem!", 5);
+            return "Wymiana ekwipunku";
+        }
+        return "Brak celu wymiany";
+    }
 
-    //private string ActivateNightVision(Player player)
-    //{
-    //    PlayerExtensions.ApplyEffect(player, EffectType.Visuals939, 1, 60f);
-    //    player.SendBroadcast("Efekt: Noktowizja aktywna 60s!", 5);
-    //    return "Noktowizja";
-    //}
+    /*
+    private string ActivateNightVision(Player player)
+    {
+        player.EffectsManager.EnableEffect<AmnesiaVision>(60f);
+        player.SendBroadcast("Efekt: Wizja amnezji aktywna na 60s!", 5);
+        return "Wizja amnezji";
+    }
+    */
 
-    //private string CreateDecoyClone(Player player)
-    //{
-    //    var dummy = Player.Create(player.Position);
-    //    dummy.DisplayNickname = $"[DUMMY] {player.Nickname}";
-    //    dummy.Role = player.Role;
-    //    dummy.Scale = new Vector3(0.8f, 0.8f, 0.8f);
-
-    //    dummy.GameObject.AddComponent<DecoyController>().Initialize(player, 30f);
-    //    return "Stworzenie klona";
-    //}
+    private string CreateDecoyClone(Player player)
+    {
+        GameObject decoy = GameObject.Instantiate(player.GameObject);
+        decoy.transform.position = player.Position;
+        NetworkServer.Spawn(decoy);
+        decoy.AddComponent<DecoyController>().Initialize(player, 30f);
+        return "Stworzenie klona";
+    }
 
     private string ShuffleAllPlayers(Player player)
     {
         var players = Player.GetPlayers().Where(p => p.IsAlive).ToList();
-        Extensions.ShuffleList(players);
+        ExtensionsStatic.ShuffleList(players);
 
-        for (int i = 0; i < players.Count; i++)
+        for (int i = 0; i < players.Count - 1; i++)
         {
-            if (i + 1 < players.Count)
-            {
-                Vector3 temp = players[i].Position;
-                players[i].Position = players[i + 1].Position;
-                players[i + 1].Position = temp;
-            }
+            Vector3 temp = players[i].Position;
+            players[i].Position = players[i + 1].Position;
+            players[i + 1].Position = temp;
         }
+        player.SendBroadcast("Przetasowano pozycje wszystkich graczy!", 5);
         return "Przetasowanie pozycji";
     }
 
-    //private string ToggleWeapons(Player player)
-    //{
-    //    bool state = rng.Next(2) == 0;
-    //    PlayerExtensions.SetWeaponEnabled(player, !state); 
-    //    player.SendBroadcast($"Efekt: Broń {(state ? "zablokowana" : "odblokowana")}!", 5);
-    //    return "Przełącz bronie";
-    //}
+    private string ToggleWeapons(Player player)
+    {
+        bool state = rng.Next(2) == 0;
+        // Placeholder: Włączanie/wyłączanie broni wymaga dostosowania
+        player.SendBroadcast($"Efekt: Broń {(state ? "zablokowana" : "odblokowana")}!", 5);
+        return "Przełącz bronie";
+    }
 
-    //private string EnableDoubleJump(Player player)
-    //{
-    //    player.GameObject.AddComponent<DoubleJumpController>();
-    //    player.SendBroadcast("Efekt: Podwójny skok aktywny!", 5);
-    //    return "Podwójny skok";
-    //}
+    /*
+    private string EnableDoubleJump(Player player)
+    {
+        player.GameObject.AddComponent<DoubleJumpController>();
+        player.SendBroadcast("Efekt: Podwójny skok aktywny!", 5);
+        return "Podwójny skok";
+    }
+    */
 
     private string CreateForceField(Player player)
     {
@@ -351,9 +340,11 @@ public class CustomPlugin
         shield.transform.position = player.Position;
         shield.transform.localScale = new Vector3(3f, 3f, 3f);
         shield.AddComponent<ForceFieldController>().Initialize(15f);
+        player.SendBroadcast("Stworzono pole siłowe na 15 sekund!", 5);
         return "Pole siłowe";
     }
 
+    /*
     private string SummonItemRain(Player player)
     {
         for (int i = 0; i < 20; i++)
@@ -362,47 +353,42 @@ public class CustomPlugin
             ItemType randomItem = ((ItemType[])Enum.GetValues(typeof(ItemType)))[rng.Next(Enum.GetValues(typeof(ItemType)).Length)];
             ItemSpawnManager.SpawnItem(randomItem, pos, Quaternion.identity);
         }
+        player.SendBroadcast("Rozpoczął się deszcz przedmiotów!", 5);
         return "Deszcz przedmiotów";
     }
+    */
 
-    //private string TimeShiftPlayers(Player player)
-    //{
-    //    var players = Player.GetPlayers().Where(p => p.IsAlive).ToList();
-    //    foreach (var p in players)
-    //    {
-    //        float timeShift = rng.Next(-60, 60);
-    //        p.GameObject.AddComponent<TimeShiftController>().Initialize(timeShift);
-    //    }
-    //    return "Przesunięcie czasowe";
-    //}
-
-    // Rozszerzone komunikaty C.A.S.S.I.E.
-    private string[] randomCassieLines = {
-        "pitch_0.8 Attention . pitch_1.2 Unusual space-time anomalies detected .",
-        "pitch_0.7 WARNING . pitch_1.5 Euclid class containment breach in progress .",
-        "pitch_1.3 All personnel . pitch_0.9 Report to nearest evacuation point immediately .",
-        // Pozostałe linie...
-    };
-
-    // Nowe funkcje pomocnicze
-    private void SetupCustomItems()
+    private string TimeShiftPlayers(Player player)
     {
-        EventManager.RegisterEvents<CustomItemHandler>(this); // Dodany brakujący parametr
+        var players = Player.GetPlayers().Where(p => p.IsAlive).ToList();
+        foreach (var p in players)
+        {
+            float timeShift = rng.Next(-60, 60);
+            p.GameObject.AddComponent<TimeShiftController>().Initialize(timeShift);
+        }
+        player.SendBroadcast("Przesunięto czas dla wszystkich graczy!", 5);
+        return "Przesunięcie czasowe";
     }
 
-    // Rozszerzone zdarzenie interakcji z drzwiami
-    //[PluginEvent(ServerEventType.PlayerInteractDoor)]
-    //private void OnDoorInteract(Player player, DoorVariant door, bool canOpen)
-    //{
-    //    if (rng.Next(100) < 5 && door.RequiredPermissions.RequiredPermissions != KeycardPermissions.None)
-    //    {
-    //        door.ServerChangeLock(DoorLockReason.AdminCommand, true); // Dodany brakujący parametr
-    //        DoorExtensions.SetOpen(door, !DoorExtensions.IsOpen(door));
-    //        player.SendBroadcast("Drzwi zostały losowo przełączone!", 3);
-    //    }
-    //}
+    // Funkcje pomocnicze
+    private void SetupCustomItems()
+    {
+        EventManager.RegisterEvents<CustomItemHandler>(this);
+    }
 
-    // Nowy system czasu gry
+    // Zdarzenie interakcji z drzwiami
+    [PluginEvent(ServerEventType.PlayerInteractDoor)]
+    private void OnDoorInteract(Player player, DoorVariant door, bool canOpen)
+    {
+        if (rng.Next(100) < 5 && door.RequiredPermissions.RequiredPermissions != KeycardPermissions.None)
+        {
+            door.ServerChangeLock(DoorLockReason.AdminCommand, true);
+            door.NetworkTargetState = !door.TargetState;
+            player.SendBroadcast("Drzwi zostały losowo przełączone!", 3);
+        }
+    }
+
+    // Zdarzenie dołączenia gracza
     [PluginEvent(ServerEventType.PlayerJoined)]
     private void OnPlayerJoined(PlayerJoinedEvent ev)
     {
@@ -412,47 +398,52 @@ public class CustomPlugin
             ev.Player.GameObject.AddComponent<VoiceModulator>().SetRandomVoice();
         }
     }
+}
 
-    // Dodatkowe komponenty
-    //public class DoubleJumpController : MonoBehaviour
-    //{
-    //    private Player player;
-    //    private int jumpsRemaining = 2;
+// Dodatkowe komponenty
+/*
+public class DoubleJumpController : MonoBehaviour
+{
+    private Player player;
+    private int jumpsRemaining = 2;
+    private PlayerMovementSync movement;
 
-    //    void Start() => player = Player.Get(gameObject);
+    void Start()
+    {
+        player = Player.Get(gameObject);
+        movement = player.GameObject.GetComponent<PlayerMovementSync>();
+    }
 
-    //    void Update()
-    //    {
-    //        if (PlayerExtensions.IsJumping(player) && jumpsRemaining > 0)
-    //        {
-    //            player.ReferenceHub.playerStats.GetModule<PlayerMovementController>().ForceJump(1.5f);
-    //            jumpsRemaining--;
-    //        }
-    //    }
-    //}
+    void Update()
+    {
+        if (jumpsRemaining > 0 && movement.IsJumping)
+        {
+            movement.ForceJump(1.5f);
+            jumpsRemaining--;
+        }
+    }
+}
+*/
 
-//    public class TimeShiftController : MonoBehaviour
-//    {
-//        private Player player;
-//        private float timeShift;
+public class TimeShiftController : MonoBehaviour
+{
+    private float timeShift;
 
-//        public void Initialize(float shift) => timeShift = shift;
+    public void Initialize(float shift) => timeShift = shift;
 
-//        void Start()
-//        {
-//            player = Player.Get(gameObject);
-//            player.SendBroadcast($"Przesunięcie czasowe: {timeShift}s!", 5);
-//            player.Position += new Vector3(0, timeShift / 10f, 0);
-//        }
-//    }
-//}
+    void Start()
+    {
+        Player player = Player.Get(gameObject);
+        player.SendBroadcast($"Przesunięcie czasowe: {timeShift}s!", 5);
+        player.Position += new Vector3(0, timeShift / 10f, 0);
+    }
+}
 
-// Dodajemy brakujące klasy i metody rozszerzające
 public class VoiceModulator : MonoBehaviour
 {
     public void SetRandomVoice()
     {
-        // Implementacja modyfikacji głosu
+        // Placeholder: Implementacja modyfikacji głosu
     }
 }
 
@@ -490,76 +481,25 @@ public class ForceFieldController : MonoBehaviour
 
 public class CustomItemHandler
 {
-    // Implementacja obsługi niestandardowych przedmiotów
+    // Placeholder: Obsługa niestandardowych przedmiotów
 }
 
+/*
 public class ItemSpawnManager
 {
     public static void SpawnItem(ItemType itemType, Vector3 position, Quaternion rotation)
     {
-        // Implementacja spawnu przedmiotu
+        var item = InventorySystem.ItemFactory.CreateItem(itemType);
+        item.transform.position = position;
+        item.transform.rotation = rotation;
+        NetworkServer.Spawn(item.gameObject);
     }
 }
-
-public class PlayerMovementController
-{
-    public void ForceJump(float jumpForce)
-    {
-        // Implementacja wymuszenia skoku
-    }
-}
+*/
 
 // Metody rozszerzające
-//public static class PlayerExtensions
-//{
-//    public static void ApplyEffect(this Player player, EffectType effectType, int intensity, float duration)
-//    {
-//        player.SendBroadcast($"Zastosowano efekt {effectType} o intensywności {intensity} na {duration} sekund", 5);
-//    }
-
-    public static bool IsJumping(this Player player)
-    {
-        // Implementacja sprawdzenia czy gracz skacze
-        return false;
-    }
-
-    public static void RemoveItem(this Player player, ItemBase item)
-    {
-        // Implementacja usuwania przedmiotu
-    }
-
-    public static void AddItem(this Player player, ItemBase item)
-    {
-        // Implementacja dodawania przedmiotu
-    }
-    
-    public static void SetWeaponEnabled(this Player player, bool enabled)
-    {
-        // Implementacja włączania/wyłączania broni
-    }
-}
-
-public static class DoorExtensions
+public static class ExtensionsStatic
 {
-    public static bool IsOpen(this DoorVariant door)
-    {
-        // Implementacja sprawdzenia czy drzwi są otwarte
-        return false;
-    }
-
-    public static void SetOpen(this DoorVariant door, bool isOpen)
-    {
-        // Implementacja otwierania/zamykania drzwi
-    }
-}
-
-public static class Extensions
-{
-    public static T GetRandomValue<T>(this IList<T> list)
-    {
-        return list[new System.Random().Next(list.Count)];
-    }
-
     public static void ShuffleList<T>(this IList<T> list)
     {
         int n = list.Count;
