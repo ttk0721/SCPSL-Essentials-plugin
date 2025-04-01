@@ -63,15 +63,19 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CustomPlugin.cs" />
+    <Compile Include="D-class_gnom.cs" />
+    <Compile Include="Late_join_system.cs" />
     <Compile Include="losowe_awarie_swiatla.cs" />
     <Compile Include="Losowe_awarie_wind.cs" />
     <Compile Include="losowe_komunikaty_C.A.S.S.T.E.cs" />
     <Compile Include="monetki.cs" />
     <Compile Include="Odwolania.cs" />
     <Compile Include="Okresowe_zamykanie_drzwi.cs" />
+    <Compile Include="pilki.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SCP-035.cs" />
     <Compile Include="Sytuacyjne_komunikaty_C.A.S.S.T.E.cs" />
-    <Compile Include="Tesla_personel_plcowki.cs" />
+    <Compile Include="Tesla_personel_placowki.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

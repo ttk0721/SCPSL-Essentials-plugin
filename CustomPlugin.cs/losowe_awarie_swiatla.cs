@@ -1,8 +1,17 @@
-﻿public partial class CustomPlugin
+﻿using System.Collections.Generic;
+using UnityEngine;
+using PluginAPI.Core;
+
+namespace CustomPlugin
 {
-    // Placeholder dla awarii światła
-    private void CauseRandomLightFailure()
+    public class LosoweAwarieSwiatla
     {
-        // Logika do zaimplementowania
+        private readonly CustomPlugin plugin;
+        private HashSet<GameObject> brokenElevators = new HashSet<GameObject>();
+
+        public LosoweAwarieSwiatla(CustomPlugin plugin)
+        {
+            this.plugin = plugin;
+        }
     }
 }
