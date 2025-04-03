@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using PluginAPI.Core;
 using PluginAPI.Core.Attributes;
 using PluginAPI.Enums;
@@ -11,71 +10,45 @@ namespace CustomPlugin
     public class LateJoinSystem
     {
         private readonly CustomPlugin plugin;
-        private readonly TimeSpan lateJoinTime = TimeSpan.FromMinutes(1); // 1 minuta na dołączenie
-        private bool lateJoinEnabled = true; // Czy system "late join" jest włączony
-        private Dictionary<Player, DateTime> playerJoinTimes = new Dictionary<Player, DateTime>(); // Czas dołączenia graczy
-        private DateTime roundStartTime; // Czas rozpoczęcia rundy
+        private readonly PluginConfig config;
 
-        public LateJoinSystem(CustomPlugin plugin)
+        public LateJoinSystem(CustomPlugin plugin, PluginConfig config)
         {
             this.plugin = plugin;
+            this.config = config;
         }
 
-        // Zdarzenie rozpoczęcia rundy
-        [PluginEvent(ServerEventType.RoundStart)]
-        private void OnRoundStart(RoundStartEvent ev)
-        {
-            if (!lateJoinEnabled)
-                return;
-
-            roundStartTime = DateTime.Now; // Zapisujemy czas rozpoczęcia rundy
-            Log.Info("System Late Join włączony. Gracze mają 1 minutę na dołączenie.");
-        }
-
-        // Zdarzenie dołączenia gracza
         [PluginEvent(ServerEventType.PlayerJoined)]
         private void OnPlayerJoined(PlayerJoinedEvent ev)
         {
-            if (!lateJoinEnabled)
+            if (!config.LateJoinEnabled)
                 return;
 
             Player player = ev.Player;
-            playerJoinTimes[player] = DateTime.Now; // Zapisujemy czas dołączenia gracza
 
-            // Obliczamy, ile czasu minęło od rozpoczęcia rundy
-            TimeSpan timeSinceRoundStart = playerJoinTimes[player] - roundStartTime;
-
-            // Sprawdzamy, czy gracz dołączył w ciągu pierwszej minuty
-            if (timeSinceRoundStart <= lateJoinTime)
+            // Sprawdzamy, czy runda się rozpoczęła
+            if (!Round.IsRoundStarted)
             {
-                // Gracz dołączył na czas
-                player.SendBroadcast("Late join sytem aktywny! Witaj w rundzie.", 5);
-                Log.Info($"{player.Nickname} dołączył na czas ({timeSinceRoundStart.TotalSeconds} sekund od startu rundy).");
+                // Runda się nie rozpoczęła, nie przypisujemy roli
+                return;
+            }
 
-                // Opcjonalnie: Przypisz rolę dla graczy, którzy dołączyli na czas
-                // Na przykład: Class-D
-                player.Role = RoleTypeId.ClassD;
+            // Sprawdzamy, czy gracz dołączył w czasie dozwolonym na "late join"
+            double secondsSinceRoundStart = (DateTime.Now - plugin.roundStartTime).TotalSeconds;
+            if (secondsSinceRoundStart <= config.LateJoinTimeSeconds)
+            {
+                // Przypisujemy losową rolę (np. Class-D lub Scientist, w zależności od ustawień)
+                RoleTypeId newRole = UnityEngine.Random.Range(0, 2) == 0 ? RoleTypeId.ClassD : RoleTypeId.Scientist;
+                player.Role = newRole;
+                player.SendBroadcast($"Dołączyłeś do rundy jako {newRole}!", 5);
+                Log.Info($"[LateJoinSystem] Gracz {player.Nickname} dołączył jako {newRole}.\n");
             }
             else
             {
-                // Gracz spóźnił się
-                //player.SendBroadcast("Spóźniłeś się! Runda już trwa.", 5);
-                //Log.Info($"{player.Nickname} spóźnił się ({timeSinceRoundStart.TotalSeconds} sekund od startu rundy).");
-
-                // Opcjonalnie: Przypisz inną rolę dla spóźnionych graczy
-                // Na przykład: Spectator (obserwator)
+                // Gracz dołączył za późno, przypisujemy rolę Spectator
                 player.Role = RoleTypeId.Spectator;
-            }
-        }
-
-        // Zdarzenie opuszczenia gry przez gracza
-        [PluginEvent(ServerEventType.PlayerLeft)]
-        private void OnPlayerLeft(PlayerLeftEvent ev)
-        {
-            // Usuwamy gracza z listy po opuszczeniu gry
-            if (playerJoinTimes.ContainsKey(ev.Player))
-            {
-                playerJoinTimes.Remove(ev.Player);
+                player.SendBroadcast("Dołączyłeś za późno, aby wziąć udział w rundzie. Jesteś obserwatorem.", 5);
+                Log.Info($"[LateJoinSystem] Gracz {player.Nickname} dołączył za późno i został obserwatorem.\n");
             }
         }
     }

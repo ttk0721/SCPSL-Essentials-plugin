@@ -60,11 +60,16 @@
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>..\..\slplugin\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
+    <Reference Include="YamlDotNet, Version=16.0.0.0, Culture=neutral, PublicKeyToken=ec19458f3c15af5e, processorArchitecture=MSIL">
+      <HintPath>..\packages\YamlDotNet.16.3.0\lib\net47\YamlDotNet.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CustomPlugin.cs" />
     <Compile Include="D-class_gnom.cs" />
+    <Compile Include="IsConfigValid.cs" />
     <Compile Include="Late_join_system.cs" />
+    <Compile Include="Lobby.cs" />
     <Compile Include="losowe_awarie_swiatla.cs" />
     <Compile Include="Losowe_awarie_wind.cs" />
     <Compile Include="losowe_komunikaty_C.A.S.S.T.E.cs" />
@@ -72,10 +77,18 @@
     <Compile Include="Odwolania.cs" />
     <Compile Include="Okresowe_zamykanie_drzwi.cs" />
     <Compile Include="pilki.cs" />
+    <Compile Include="Plugin_config.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SCP-035.cs" />
     <Compile Include="Sytuacyjne_komunikaty_C.A.S.S.T.E.cs" />
     <Compile Include="Tesla_personel_placowki.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="app.config" />
+    <None Include="packages.config" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PreBuildEvent>xcopy "$(TargetDir)CustomPlugin.cs.dll" "C:\Users\Komputer\AppData\Roaming\SCP Secret Labolatory\plugins\global\" /Y</PreBuildEvent>
+  </PropertyGroup>
 </Project>

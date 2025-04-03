@@ -11,7 +11,6 @@ using PlayerRoles;
 using InventorySystem;
 using InventorySystem.Items;
 using Mirror;
-using System.Collections;
 
 namespace CustomPlugin
 {
@@ -19,51 +18,94 @@ namespace CustomPlugin
     {
         private readonly CustomPlugin plugin;
         private readonly System.Random rng = new System.Random(); // Lokalna instancja rng
-        private readonly int coinOutcomes = 25; // 25 różnych efektów
-        private Dictionary<Player, Coroutine> activeCoroutines = new Dictionary<Player, Coroutine>();
+        private readonly PluginConfig config; // Referencja do konfiguracji
+        private readonly HashSet<ushort> usedCoins = new HashSet<ushort>(); // Zbiór przechowujący seriale użytych monetek
 
-        public Monetki(CustomPlugin plugin)
+        public Monetki(CustomPlugin plugin, PluginConfig config)
         {
             this.plugin = plugin;
+            this.config = config;
         }
 
-        // Zdarzenie rzutu monetą z 25 efektami
+        // Resetowanie użytych monetek na początku rundy
+        [PluginEvent]
+        private void OnRoundStart(RoundStartEvent ev)
+        {
+            usedCoins.Clear();
+            Log.Info("[Monetki] Zresetowano listę użytych monetek na początku rundy.");
+        }
+
+        // Zdarzenie rzutu monetą z efektami
         [PluginEvent]
         private void OnPlayerCoinFlip(PlayerCoinFlipEvent ev)
         {
-            Player player = ev.Player;
-            int outcome = rng.Next(coinOutcomes);
-
-            string effectName;
-            switch (outcome)
+            // Sprawdzamy, czy mechanika monetek jest włączona
+            if (!config.CoinsEnabled)
             {
-                case 0: effectName = TeleportPlayer(player); break;
-                case 1: effectName = HealPlayer(player); break;
-                case 2: effectName = ChangePlayerClass(player); break;
-                // case 3: effectName = GrantTemporaryInvisibility(player); break; // Zakomentowane (PlayerEffects)
-                // case 4: effectName = BoostPlayerSpeed(player); break; // Zakomentowane (PlayerMovementSync)
-                case 5: effectName = GiveRandomItem(player); break;
-                case 6: effectName = GrantDamageImmunity(player); break;
-                case 7: effectName = DropCurrentItem(player); break;
-                case 8: effectName = SwapWithRandomPlayer(player); break;
-                case 9: effectName = TeleportToRandomRoom(player); break;
-                case 10: effectName = BoostDamageOutput(player); break;
-                case 11: effectName = PullNearbyPlayers(player); break;
-                case 12: effectName = DisguisePlayer(player); break;
-                // case 13: effectName = TemporaryAmnesia(player); break; // Zakomentowane (PlayerEffects)
-                // case 14: effectName = SpawnGrenadeNearby(player); break; // Zakomentowane (ItemFactory)
-                // case 15: effectName = InvertPlayerControls(player); break; // Zakomentowane (PlayerEffects)
-                case 16: effectName = SwapInventoryWithRandom(player); break;
-                // case 17: effectName = ActivateNightVision(player); break; // Zakomentowane (PlayerEffects)
-                case 18: effectName = CreateDecoyClone(player); break;
-                case 19: effectName = ShuffleAllPlayers(player); break;
-                case 20: effectName = ToggleWeapons(player); break;
-                // case 21: effectName = EnableDoubleJump(player); break; // Zakomentowane (PlayerMovementSync)
-                case 22: effectName = CreateForceField(player); break;
-                // case 23: effectName = SummonItemRain(player); break; // Zakomentowane (ItemFactory)
-                case 24: effectName = TimeShiftPlayers(player); break;
-                default: effectName = "Nieznany efekt"; break;
+                ev.Player.SendBroadcast("Mechanika monetek jest wyłączona!", 5);
+                return;
             }
+
+            Player player = ev.Player;
+
+            // Sprawdzamy, czy gracz trzyma monetkę
+            if (player.CurrentItem == null || player.CurrentItem.ItemTypeId != ItemType.Coin)
+            {
+                player.SendBroadcast("Nie trzymasz monetki!", 5);
+                return;
+            }
+
+            // Sprawdzamy, czy monetka została już użyta w tej rundzie
+            ushort coinSerial = player.CurrentItem.ItemSerial;
+            if (usedCoins.Contains(coinSerial))
+            {
+                player.SendBroadcast("Ta monetka została już użyta w tej rundzie!", 5);
+                return;
+            }
+
+            // Tworzymy listę dostępnych efektów na podstawie konfiguracji
+            var availableEffects = new List<(int Index, Func<Player, string> Effect, string Name)>();
+            if (config.CoinEffectTeleportPlayer) availableEffects.Add((0, TeleportPlayer, "Teleportacja"));
+            if (config.CoinEffectHealPlayer) availableEffects.Add((1, HealPlayer, "Leczenie"));
+            if (config.CoinEffectChangePlayerClass) availableEffects.Add((2, ChangePlayerClass, "Zmiana klasy"));
+            if (config.CoinEffectGiveRandomItem) availableEffects.Add((5, GiveRandomItem, "Losowy przedmiot"));
+            if (config.CoinEffectGrantDamageImmunity) availableEffects.Add((6, GrantDamageImmunity, "Odporność na obrażenia"));
+            if (config.CoinEffectDropCurrentItem) availableEffects.Add((7, DropCurrentItem, "Upuszczenie przedmiotu"));
+            if (config.CoinEffectSwapWithRandomPlayer) availableEffects.Add((8, SwapWithRandomPlayer, "Zamiana miejscami"));
+            if (config.CoinEffectTeleportToRandomRoom) availableEffects.Add((9, TeleportToRandomRoom, "Teleportacja do pomieszczenia"));
+            if (config.CoinEffectBoostDamageOutput) availableEffects.Add((10, BoostDamageOutput, "Zwiększenie obrażeń"));
+            if (config.CoinEffectPullNearbyPlayers) availableEffects.Add((11, PullNearbyPlayers, "Przyciągnięcie graczy"));
+            if (config.CoinEffectDisguisePlayer) availableEffects.Add((12, DisguisePlayer, "Przebranie"));
+            if (config.CoinEffectSwapInventoryWithRandom) availableEffects.Add((16, SwapInventoryWithRandom, "Wymiana ekwipunku"));
+            if (config.CoinEffectCreateDecoyClone) availableEffects.Add((18, CreateDecoyClone, "Stworzenie klona"));
+            if (config.CoinEffectShuffleAllPlayers) availableEffects.Add((19, ShuffleAllPlayers, "Przetasowanie pozycji"));
+            if (config.CoinEffectToggleWeapons) availableEffects.Add((20, ToggleWeapons, "Przełącz bronie"));
+            if (config.CoinEffectCreateForceField) availableEffects.Add((22, CreateForceField, "Pole siłowe"));
+            if (config.CoinEffectTimeShiftPlayers) availableEffects.Add((24, TimeShiftPlayers, "Przesunięcie czasowe"));
+
+            // Sprawdzamy, czy są dostępne jakieś efekty
+            if (availableEffects.Count == 0)
+            {
+                player.SendBroadcast("Brak włączonych efektów monetek!", 5);
+                return;
+            }
+
+            // Oznaczamy monetkę jako użyta
+            usedCoins.Add(coinSerial);
+
+            // Uruchamiamy efekt z opóźnieniem
+            ApplyEffectWithDelay(player, availableEffects);
+        }
+
+        // Metoda do opóźnionego wykonania efektu
+        private async void ApplyEffectWithDelay(Player player, List<(int Index, Func<Player, string> Effect, string Name)> availableEffects)
+        {
+            // Opóźnienie 1 sekundy, aby zsynchronizować z animacją podrzucenia monetki
+            await Task.Delay(1000); // 1000 ms = 1 sekunda
+
+            // Losujemy efekt spośród dostępnych
+            var selectedEffect = availableEffects[rng.Next(availableEffects.Count)];
+            string effectName = selectedEffect.Effect(player);
 
             Log.Info($"[CoinFlip] {player.Nickname} otrzymał efekt: {effectName}");
         }

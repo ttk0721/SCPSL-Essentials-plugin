@@ -12,94 +12,86 @@ namespace CustomPlugin
     public class OkresoweZamykanieDrzwi
     {
         private readonly CustomPlugin plugin;
-        private readonly System.Random rng = new System.Random(); // Lokalna instancja rng
+        private readonly PluginConfig config; // Dodajemy konfigurację
+        private readonly System.Random rng = new System.Random();
         private bool isDoorLockdownActive = false;
 
-        public OkresoweZamykanieDrzwi(CustomPlugin plugin)
+        public OkresoweZamykanieDrzwi(CustomPlugin plugin, PluginConfig config)
         {
             this.plugin = plugin;
+            this.config = config;
         }
 
-        // Zdarzenie startu rundy, aby uruchomić harmonogram zamykania drzwi
         [PluginEvent(ServerEventType.RoundStart)]
         private void OnRoundStart()
         {
+            if (!config.DoorLockdownEnabled)
+            {
+                Log.Info($"[OkresoweZamykanieDrzwi] Okresowe zamykanie drzwi jest wyłączone w konfiguracji.\n");
+                return;
+            }
+
             StartDoorLockdownScheduler();
         }
 
-        // Harmonogram zamykania drzwi
         private async void StartDoorLockdownScheduler()
         {
-            while (true) // Pętla działa przez całą rundę
+            while (true)
             {
-                // Losowy czas oczekiwania między 180 a 300 sekund (3–5 minut)
-                int delaySeconds = rng.Next(180, 301); // Używamy lokalnego rng
-                await Task.Delay(delaySeconds * 1000); // Konwersja na milisekundy
+                int delaySeconds = rng.Next(config.DoorLockdownMinIntervalSeconds, config.DoorLockdownMaxIntervalSeconds + 1);
+                await Task.Delay(delaySeconds * 1000);
 
-                // Sprawdzenie, czy runda nadal trwa
                 if (!Round.IsRoundStarted)
                     break;
 
-                // Uruchomienie procedury zamykania drzwi
                 await ExecuteDoorLockdown();
             }
         }
 
-        // Procedura zamykania i blokowania wszystkich drzwi
         private async Task ExecuteDoorLockdown()
         {
             if (isDoorLockdownActive)
-                return; // Zapobiega nakładaniu się procedur
+                return;
 
             isDoorLockdownActive = true;
             try
             {
-                // Log dla debugowania, aby upewnić się, że funkcja jest wywoływana
-                Log.Info("Rozpoczynanie procedury lockdown: zamykanie i blokowanie wszystkich drzwi.");
-
-                // Komunikat C.A.S.S.I.E. z alarmem, efektami glitch i wyświetleniem na ekranie
-                Log.Info("Wysyłanie komunikatu C.A.S.S.I.E...");
+                Log.Info($"[OkresoweZamykanieDrzwi] Rozpoczynanie procedury lockdown: zamykanie i blokowanie wszystkich drzwi.\n");
+                Log.Info($"[OkresoweZamykanieDrzwi] Wysyłanie komunikatu C.A.S.S.I.E...\n");
                 Cassie.Message("Facility activated lockdown protocol all doors closed", true, true, true);
 
-                // Pobranie wszystkich drzwi na mapie
                 var doors = DoorVariant.AllDoors;
 
-                // Iteracja po wszystkich drzwiach: zamykanie otwartych i blokowanie wszystkich
                 foreach (var door in doors)
                 {
                     if (door == null)
                         continue;
 
-                    // Zamknięcie drzwi, jeśli są otwarte
-                    if (door.TargetState) // TargetState == true oznacza, że drzwi są otwarte
+                    if (door.TargetState)
                     {
-                        door.NetworkTargetState = false; // Zamknij drzwi
+                        door.NetworkTargetState = false;
                     }
 
-                    // Zablokowanie drzwi, niezależnie od ich stanu
                     door.ServerChangeLock(DoorLockReason.AdminCommand, true);
                 }
 
-                // Log dla debugowania
-                Log.Info("Wszystkie drzwi zostały zamknięte i zablokowane w ramach procedury lockdown.");
+                Log.Info($"[OkresoweZamykanieDrzwi] Wszystkie drzwi zostały zamknięte i zablokowane w ramach procedury lockdown.\n");
 
-                // Odblokowanie drzwi po 15 sekundach
-                await Task.Delay(15000); // 15 sekund opóźnienia
+                await Task.Delay(config.DoorLockdownDurationSeconds * 1000);
 
                 foreach (var door in doors)
                 {
                     if (door == null)
                         continue;
 
-                    // Odblokowanie drzwi
                     door.ServerChangeLock(DoorLockReason.AdminCommand, false);
                 }
 
-                Log.Info("Wszystkie drzwi zostały odblokowane po 15 sekundach.");
+                Log.Info($"[OkresoweZamykanieDrzwi] Wszystkie drzwi zostały odblokowane po {config.DoorLockdownDurationSeconds} sekundach.\n");
             }
             catch (System.Exception ex)
             {
-                Log.Error($"Błąd podczas zamykania drzwi: {ex.Message}");
+                Log.Error($"[OkresoweZamykanieDrzwi] Błąd podczas zamykania drzwi: {ex.Message}\n");
             }
             finally
             {
@@ -107,11 +99,10 @@ namespace CustomPlugin
             }
         }
 
-        // Zdarzenie interakcji z drzwiami
         [PluginEvent(ServerEventType.PlayerInteractDoor)]
         private void OnDoorInteract(Player player, DoorVariant door, bool canOpen)
         {
-            if (rng.Next(100) < 5 && door.RequiredPermissions.RequiredPermissions != KeycardPermissions.None) // Używamy lokalnego rng
+            if (rng.Next(100) < 5 && door.RequiredPermissions.RequiredPermissions != KeycardPermissions.None)
             {
                 door.ServerChangeLock(DoorLockReason.AdminCommand, true);
                 door.NetworkTargetState = !door.TargetState;

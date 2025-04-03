@@ -115,3 +115,9 @@ public static class ExtensionsStatic
         }
     }
 }
+
+// Klasa do uruchamiania korutyn
+public class CoroutineRunner : MonoBehaviour
+{
+    // Może być pusta, wystarczy że dziedziczy po MonoBehaviour
+}

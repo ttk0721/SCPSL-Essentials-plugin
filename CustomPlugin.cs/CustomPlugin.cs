@@ -7,6 +7,7 @@ using PluginAPI.Core;
 using PluginAPI.Core.Attributes;
 using PluginAPI.Enums;
 using PluginAPI.Events;
+using System.IO;
 
 namespace CustomPlugin
 {
@@ -17,30 +18,73 @@ namespace CustomPlugin
         private bool spyAssigned = false;
         private static System.Random rng = new System.Random();
         private readonly ItemType Scp035ItemType = ItemType.KeycardO5;
-        private DateTime roundStartTime;
-        private bool voiceChatEnabled = false;
+        public DateTime roundStartTime;
+        private PluginConfig config; // Obiekt konfiguracji
 
-        [PluginEntryPoint("CustomPlugin", "2.0.2", "Rozbudowany plugin z dodatkowymi funkcjami", "Autor:ttk0721")]
+        [PluginEntryPoint("CustomPlugin", "0.0.4-alpha", "Rozbudowany plugin z dodatkowymi funkcjami", "Autor:ttk0721")]
         private void OnLoaded()
         {
-            EventManager.RegisterEvents(this);
-            EventManager.RegisterEvents(this, new Monetki(this)); // Rejestracja Monetki
-            EventManager.RegisterEvents(this, new LosoweKomunikaty(this)); // Rejestracja LosoweKomunikaty
-            EventManager.RegisterEvents(this, new LosoweAwarieSwiatla(this)); // Rejestracja LosoweAwarieSwiatla
-            EventManager.RegisterEvents(this, new OkresoweZamykanieDrzwi(this)); // Rejestracja OkresoweZamykanieDrzwi
-            EventManager.RegisterEvents(this, new LosoweAwarieWind(this)); // Rejestracja LosoweAwarieWind
-            EventManager.RegisterEvents(this, new TeslaPersonelPlacowki(this)); // Rejestracja TeslaPersonelPlcowki
-            EventManager.RegisterEvents(this, new LateJoinSystem(this)); // Rejestracja LateJoinSystem
-            Log.Info("CustomPlugin 2.0 załadowany!");
-            InitializeVoiceChat();
-            SetupCustomItems();
-        }
+            // Ścieżka bezwzględna do folderu wtyczek
+            string pluginsDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SCP Secret Laboratory", "PluginAPI", "plugins");
 
-        // Inicjalizacja czatu głosowego
-        private void InitializeVoiceChat()
-        {
-            voiceChatEnabled = true;
-            Log.Info("Inicjalizacja czatu głosowego...");
+            // Ścieżka do folderu global
+            string globalDirectory = Path.Combine(pluginsDirectory, "global");
+            if (!Directory.Exists(globalDirectory))
+            {
+                Directory.CreateDirectory(globalDirectory);
+                Log.Info($"[CustomPlugin] Utworzono folder global: {globalDirectory}\n");
+            }
+
+            // Ścieżka do folderu wtyczki wewnątrz folderu global
+            string pluginDirectory = Path.Combine(globalDirectory, "CustomPlugin");
+            if (!Directory.Exists(pluginDirectory))
+            {
+                Directory.CreateDirectory(pluginDirectory);
+                Log.Info($"[CustomPlugin] Utworzono folder wtyczki w folderze global: {pluginDirectory}\n");
+            }
+
+            // Ścieżka do pliku konfiguracyjnego
+            string configPath = Path.Combine(pluginDirectory, "config.yml");
+
+            // Wczytanie i weryfikacja konfiguracji za pomocą IsConfigValid
+            config = IsConfigValid.LoadAndValidateConfig(configPath);
+
+            // Sprawdzenie, czy wtyczka jest włączona
+            if (!config.IsEnabled)
+            {
+                Log.Info($"[CustomPlugin] Wtyczka jest wyłączona w konfiguracji.\n");
+                return;
+            }
+
+            // Rejestracja zdarzeń
+            EventManager.RegisterEvents(this);
+            EventManager.RegisterEvents(this, new Monetki(this, config));
+            EventManager.RegisterEvents(this, new LosoweKomunikaty(this, config));
+            EventManager.RegisterEvents(this, new LosoweAwarieSwiatla(this));
+            EventManager.RegisterEvents(this, new OkresoweZamykanieDrzwi(this, config));
+            EventManager.RegisterEvents(this, new LosoweAwarieWind(this));
+            EventManager.RegisterEvents(this, new LateJoinSystem(this, config));
+            //EventManager.RegisterEvents(this, new Lobby(this, config)); // Dodajemy rejestrację klasy Lobby
+
+            Log.Info($"[CustomPlugin] CustomPlugin 0.0.4-alpha załadowany!\n");
+            SetupCustomItems();
+
+            // Uzyskujemy lub tworzymy obiekt CoroutineRunner
+            CoroutineRunner coroutineRunner = GameObject.FindObjectOfType<CoroutineRunner>();
+            if (coroutineRunner == null)
+            {
+                GameObject go = new GameObject("CoroutineRunner");
+                UnityEngine.Object.DontDestroyOnLoad(go); // Zapobiega niszczeniu obiektu przy przeładowaniu sceny
+                coroutineRunner = go.AddComponent<CoroutineRunner>();
+            }
+
+            // Rejestrujemy eventy dla Lobby, przekazując CoroutineRunner
+            EventManager.RegisterEvents(this, new Lobby(coroutineRunner, config));
+
+            Log.Info($"[CustomPlugin] CustomPlugin 0.0.4-alpha załadowany!\n");
+            Log.Warning($"[CustomPlugin] Uwaga: Wtyczka w fazie alpha i może zawierać błędy.\n");
+            SetupCustomItems();
+
         }
 
         // Funkcje pomocnicze
@@ -53,10 +97,32 @@ namespace CustomPlugin
         [PluginEvent(ServerEventType.PlayerJoined)]
         private void OnPlayerJoined(PlayerJoinedEvent ev)
         {
-            if (voiceChatEnabled)
+            Player player = ev.Player;
+            Log.Info($"[CustomPlugin] Gracz {player.Nickname} dołączył do gry.\n");
+
+            // Sprawdzamy, czy runda się rozpoczęła (dla przyszłych potrzeb)
+            if (!Round.IsRoundStarted)
             {
-                ev.Player.GameObject.AddComponent<VoiceModulator>().SetRandomVoice();
+                // Powiadomienie usunięte na żądanie
             }
+        }
+
+        // Zdarzenie rozpoczęcia rundy
+        [PluginEvent(ServerEventType.RoundStart)]
+        private void OnRoundStart(RoundStartEvent ev)
+        {
+            roundInProgress = true;
+            roundStartTime = DateTime.Now;
+            Log.Info($"[CustomPlugin] Runda rozpoczęta o {roundStartTime}.\n");
+        }
+
+        // Zdarzenie zakończenia rundy
+        [PluginEvent(ServerEventType.RoundEnd)]
+        private void OnRoundEnd(RoundEndEvent ev)
+        {
+            roundInProgress = false;
+            spyAssigned = false;
+            Log.Info($"[CustomPlugin] Runda zakończona.\n");
         }
     }
 }
