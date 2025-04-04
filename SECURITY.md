@@ -26,3 +26,6 @@ We aim to respond within **14 days** depending on the severity and availability.
 - If applicable, you may receive credit upon public disclosure.
 
 Thank you for supporting secure plugin development!
+
+[To read the PL version, click here](https://github.com/ttk0721/SCPSL-Essentials-plugin/blob/master/SECURITY-PL.md)
+
