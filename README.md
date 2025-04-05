@@ -116,14 +116,14 @@ Zwraca historię banów dla podanego SteamID.
 ```json
 {
   "wasLocalBanned": true,
-  "localBanCount": 3,
+  "localBanCount": 30,
   "isCurrentlyLocalBanned": false,
   "localBanServerCount": 2,
   "wasGlobalBanned": true,
   "globalBanCount": 1,
   "isCurrentlyGlobalBanned": true,
   "globalBanReason": "Massive TK wielokrotny",
-  "warningLevel": 3
+  "warningLevel": 5
 }
 ```
 
