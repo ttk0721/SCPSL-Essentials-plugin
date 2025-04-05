@@ -131,7 +131,7 @@ Zwraca historię banów dla podanego SteamID.
 
 ### ⚠️ Warning Level
 
-API zwraca też wartość `warningLevel` w przedziale `0–5`, obliczaną na podstawie historii kar gracza:
+API zwraca też wartość `warningLevel` w przedziale `0–7`, obliczaną na podstawie historii kar gracza:
 
 
 
