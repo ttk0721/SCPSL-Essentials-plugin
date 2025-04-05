@@ -95,6 +95,46 @@ LobbySystemEnabled: true
 
 Cały szablon konfiguracyjny znajdziesz w pliku `config.yml` generowanym przy pierwszym uruchomieniu pluginu.
 
+---
+
+## 📡 API Banów – SCPSL Essentials Plugin
+
+Wtyczka umożliwia zewnętrzne zarządzanie banami przez REST API. Dzięki niej serwery SCPSL mogą współdzielić informacje o banach i obsługiwać bany globalne oraz lokalne.
+
+---
+
+### 🔐 Endpointy
+
+#### `GET /api/ban/history/{steamid}`
+
+Zwraca historię banów dla podanego SteamID.
+
+- `steamid` – identyfikator Steam64 gracza (np. `00000000000000000`)
+
+**Przykładowa odpowiedź:**
+
+```json
+{
+  "wasLocalBanned": true,
+  "localBanCount": 3,
+  "isCurrentlyLocalBanned": false,
+  "localBanServerCount": 2,
+  "wasGlobalBanned": true,
+  "globalBanCount": 1,
+  "isCurrentlyGlobalBanned": true,
+  "globalBanReason": "Massive TK wielokrotny",
+  "warningLevel": 3
+}
+```
+
+---
+
+### ⚠️ Warning Level
+
+API zwraca też wartość `warningLevel` w przedziale `0–5`, obliczaną na podstawie historii kar gracza:
+
+
+
 📜 Changelog
 ------------
 
