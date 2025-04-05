@@ -123,7 +123,7 @@ Zwraca historię banów dla podanego SteamID.
   "globalBanCount": 1,
   "isCurrentlyGlobalBanned": true,
   "globalBanReason": "Massive TK wielokrotny",
-  "warningLevel": 5
+  "warningLevel": 2
 }
 ```
 
