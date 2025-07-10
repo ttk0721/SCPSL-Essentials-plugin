@@ -21,7 +21,7 @@ namespace CustomPlugin
         public DateTime roundStartTime;
         private PluginConfig config; // Obiekt konfiguracji
 
-        [PluginEntryPoint("CustomPlugin", "0.0.4-alpha", "Rozbudowany plugin z dodatkowymi funkcjami", "Autor:ttk0721")]
+        [PluginEntryPoint("CustomPlugin", "0.0.5-alpha", "Rozbudowany plugin z dodatkowymi funkcjami", "Autor:ttk0721")]
         private void OnLoaded()
         {
             // Ścieżka bezwzględna do folderu wtyczek
@@ -66,7 +66,7 @@ namespace CustomPlugin
             EventManager.RegisterEvents(this, new LateJoinSystem(this, config));
             //EventManager.RegisterEvents(this, new Lobby(this, config)); // Dodajemy rejestrację klasy Lobby
 
-            Log.Info($"[CustomPlugin] CustomPlugin 0.0.4-alpha załadowany!\n");
+            Log.Info($"[CustomPlugin] CustomPlugin 0.0.5-alpha załadowany!\n");
             SetupCustomItems();
 
             // Uzyskujemy lub tworzymy obiekt CoroutineRunner
@@ -81,7 +81,7 @@ namespace CustomPlugin
             // Rejestrujemy eventy dla Lobby, przekazując CoroutineRunner
             EventManager.RegisterEvents(this, new Lobby(coroutineRunner, config));
 
-            Log.Info($"[CustomPlugin] CustomPlugin 0.0.4-alpha załadowany!\n");
+            Log.Info($"[CustomPlugin] CustomPlugin 0.0.5-alpha załadowany!\n");
             Log.Warning($"[CustomPlugin] Uwaga: Wtyczka w fazie alpha i może zawierać błędy.\n");
             SetupCustomItems();
 

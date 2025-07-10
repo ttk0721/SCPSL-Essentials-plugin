@@ -87,6 +87,12 @@
     <None Include="app.config" />
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\LabAPI-1.1.0\LabAPI-1.1.0\LabApi\LabApi.csproj">
+      <Project>{0bce584f-43f2-4e28-ae8f-90a505bded69}</Project>
+      <Name>LabApi</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PreBuildEvent>xcopy "$(TargetDir)CustomPlugin.cs.dll" "C:\Users\Komputer\AppData\Roaming\SCP Secret Labolatory\plugins\global\" /Y</PreBuildEvent>
