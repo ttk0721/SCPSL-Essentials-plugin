@@ -1,3 +1,6 @@
+# ⚠️ Projekt zostanie przepisany na LabApi, projekt zostaje tutaj jako publiczne archiwum.
+
+
 # SCPSL-Essentials-plugin
 
 Wtyczka do gry [SCP: Secret Laboratory](https://scpslgame.com/), której celem jest dodanie przydatnych ulepszeń do gry.
